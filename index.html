@@ -418,7 +418,16 @@
                 const profitToCashout = balance - currentBaseline;
                 cashedOutAmount += profitToCashout;
                 balance -= profitToCashout;
-                currentBaseline = balance;
+                
+                // BUG FIX: Correctly set the new baseline.
+                // If we are recovering (below original start), the new baseline is the current balance.
+                // If we are in profit (above original start), the baseline should reset to the original starting balance to allow for repeated cashouts from that point.
+                if (balance < originalInitialBalance) {
+                    currentBaseline = balance;
+                } else {
+                    currentBaseline = originalInitialBalance;
+                }
+
                 pendingTableChange = true;
                 logMessage(`--- <span class="cashout font-bold">Cashed out ₹${profitToCashout.toLocaleString('en-IN')}!</span> New baseline is ₹${currentBaseline.toLocaleString('en-IN')}. Will change tables on next win. ---`, 'cashout');
             }
