@@ -89,7 +89,7 @@
     <div class="w-full max-w-6xl bg-gray-900 rounded-2xl shadow-2xl p-6 md:p-8 space-y-6">
         
         <div class="text-center">
-            <h1 class="text-3xl md:text-4xl font-bold text-amber-400">H3KZ Roulette Strategy Simulator v1.02</h1>
+            <h1 class="text-3xl md:text-4xl font-bold text-amber-400">H3KZ Roulette Strategy Simulator</h1>
             <p class="text-gray-400 mt-2">Test the Fibonacci Strategy with Custom Settings & Cashout</p>
         </div>
 
@@ -119,7 +119,7 @@
                 <input type="number" id="free-spin-trigger" value="8" class="w-full p-2 rounded-md">
             </div>
              <div>
-                <label for="cashout-slider" class="block text-sm font-medium text-gray-400 mb-1">Cashout At <span id="cashout-value" class="font-bold text-amber-400">25%</span> Profit</label>
+                <label for="cashout-slider" class="block text-sm font-medium text-gray-400 mb-1">Recovery Cashout At <span id="cashout-value" class="font-bold text-amber-400">25%</span></label>
                 <input type="range" id="cashout-slider" min="5" max="50" value="25" step="5" class="w-full">
             </div>
             <div>
@@ -203,7 +203,7 @@
                 </summary>
                 <div class="mt-4 text-gray-400 space-y-2 text-sm">
                     <p><strong class="text-amber-400">Betting Progression:</strong> The game uses a Fibonacci-style sequence. After a loss, the next bet is increased. After a win, the bet resets to the minimum (₹50).</p>
-                    <p><strong class="text-amber-400">Cashout:</strong> After any win, the system checks if the current balance has grown by the set percentage over the last baseline. If so, the profit is moved to the "Cashed Out" wallet, and a table change is scheduled for the next win.</p>
+                    <p><strong class="text-amber-400">Cashout Logic:</strong> This strategy has two modes. <strong>1) Profit Skimming:</strong> If your current balance is above your original starting balance, any win that results in a profit will have that profit immediately cashed out, resetting your in-play balance to the original start. <strong>2) Recovery:</strong> If your balance is below the original start (after a stop-loss), it uses the slider percentage to cash out smaller, incremental gains, updating the baseline each time to lock in progress.</p>
                     <p><strong class="text-amber-400">Stop-Loss:</strong> If the total loss within a single losing streak exceeds the set percentage of the current baseline, the streak is abandoned, the bet resets to the minimum, and the balance at that point becomes the new baseline.</p>
                     <p><strong class="text-amber-400">Free Spin Mode:</strong> If a losing streak reaches the set number of losses, betting pauses. The game then waits for a "favorable" outcome on free spins before resuming bets.</p>
                     <p><strong class="text-amber-400">Double Confirmation:</strong> If free spins continue for more than half the trigger amount, the system requires two consecutive favorable outcomes before resuming bets.</p>
@@ -413,23 +413,26 @@
         }
         
         function checkForCashout() {
-            const cashoutThreshold = currentBaseline * (1 + cashoutPercent);
-            if (balance >= cashoutThreshold) {
-                const profitToCashout = balance - currentBaseline;
+            // Mode 1: Profit Skimming (above original investment)
+            if (balance > originalInitialBalance) {
+                const profitToCashout = balance - originalInitialBalance;
                 cashedOutAmount += profitToCashout;
-                balance -= profitToCashout;
-                
-                // BUG FIX: Correctly set the new baseline.
-                // If we are recovering (below original start), the new baseline is the current balance.
-                // If we are in profit (above original start), the baseline should reset to the original starting balance to allow for repeated cashouts from that point.
-                if (balance < originalInitialBalance) {
-                    currentBaseline = balance;
-                } else {
-                    currentBaseline = originalInitialBalance;
-                }
-
+                balance = originalInitialBalance;
+                currentBaseline = originalInitialBalance;
                 pendingTableChange = true;
-                logMessage(`--- <span class="cashout font-bold">Cashed out ₹${profitToCashout.toLocaleString('en-IN')}!</span> New baseline is ₹${currentBaseline.toLocaleString('en-IN')}. Will change tables on next win. ---`, 'cashout');
+                logMessage(`--- <span class="cashout font-bold">Profit Skim: ₹${profitToCashout.toLocaleString('en-IN')} cashed out!</span> In-play balance reset to start. ---`, 'cashout');
+            } 
+            // Mode 2: Recovery (below original investment)
+            else {
+                const cashoutThreshold = currentBaseline * (1 + cashoutPercent);
+                if (balance >= cashoutThreshold) {
+                    const profitToCashout = balance - currentBaseline;
+                    cashedOutAmount += profitToCashout;
+                    balance -= profitToCashout;
+                    currentBaseline = balance;
+                    pendingTableChange = true;
+                    logMessage(`--- <span class="cashout font-bold">Recovery Cashout: ₹${profitToCashout.toLocaleString('en-IN')} secured!</span> New baseline is ₹${currentBaseline.toLocaleString('en-IN')}. ---`, 'cashout');
+                }
             }
         }
 
