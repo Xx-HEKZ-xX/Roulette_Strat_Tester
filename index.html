@@ -1,1 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H3KZ roulette strategy simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+        }
+        .number-display {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+        .number-red { background-color: #B91C1C; }
+        .number-black { background-color: #1F2937; }
+        .number-green { background-color: #047857; }
+        .win { color: #22C55E; }
+        .loss { color: #EF4444; }
+        .cashout { color: #38BDF8; } /* Light Blue for cashout */
+        .info { color: #FBBF24; } /* Amber for info/mode change */
+        .highlight {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 15px rgba(255, 255, 100, 0.3);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 25px rgba(255, 255, 100, 0.7);
+            }
+        }
+        /* Custom input styles */
+        input[type="number"], select {
+            background-color: #374151;
+            border: 1px solid #4B5563;
+            color: white;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            background: #4B5563;
+            height: 4px;
+            border-radius: 2px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            background: #F59E0B;
+            border-radius: 50%;
+            margin-top: -6px;
+            cursor: pointer;
+        }
+        details > summary {
+            list-style: none;
+            cursor: pointer;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+        details summary .arrow {
+            transition: transform 0.2s;
+        }
+        details[open] summary .arrow {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body class="text-white flex items-center justify-center min-h-screen p-4">
 
+    <div class="w-full max-w-6xl bg-gray-900 rounded-2xl shadow-2xl p-6 md:p-8 space-y-6">
+        
+        <div class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-amber-400">H3KZ Roulette Strategy Simulator</h1>
+            <p class="text-gray-400 mt-2">Test the Fibonacci Strategy with Custom Settings & Cashout</p>
+        </div>
+
+        <!-- Settings -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-gray-800 p-4 rounded-lg">
+            <div>
+                <label for="start-balance" class="block text-sm font-medium text-gray-400 mb-1">Starting Balance (₹)</label>
+                <input type="number" id="start-balance" value="11650" class="w-full p-2 rounded-md">
+            </div>
+            <div>
+                <label for="target-balance" class="block text-sm font-medium text-gray-400 mb-1">Target Balance (₹)</label>
+                <input type="number" id="target-balance" value="23300" class="w-full p-2 rounded-md">
+            </div>
+            <div>
+                <label for="bet-selection" class="block text-sm font-medium text-gray-400 mb-1">Bet On</label>
+                <select id="bet-selection" class="w-full p-2 rounded-md">
+                    <option value="dozen1">1st Dozen (1-12)</option>
+                    <option value="dozen2">2nd Dozen (13-24)</option>
+                    <option value="dozen3">3rd Dozen (25-36)</option>
+                    <option value="col1">1st Column</option>
+                    <option value="col2">2nd Column</option>
+                    <option value="col3">3rd Column</option>
+                </select>
+            </div>
+            <div>
+                <label for="free-spin-trigger" class="block text-sm font-medium text-gray-400 mb-1">Free Spin After Losses</label>
+                <input type="number" id="free-spin-trigger" value="8" class="w-full p-2 rounded-md">
+            </div>
+             <div>
+                <label for="cashout-slider" class="block text-sm font-medium text-gray-400 mb-1">Cashout At <span id="cashout-value" class="font-bold text-amber-400">25%</span> Profit</label>
+                <input type="range" id="cashout-slider" min="5" max="50" value="25" step="5" class="w-full">
+            </div>
+            <div>
+                <label for="stoploss-slider" class="block text-sm font-medium text-gray-400 mb-1">Streak Stop-Loss: <span id="stoploss-value" class="font-bold text-amber-400">10%</span></label>
+                <input type="range" id="stoploss-slider" min="5" max="50" value="10" step="1" class="w-full">
+            </div>
+        </div>
+
+        <!-- Main Display -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Left Panel -->
+            <div class="space-y-6">
+                 <!-- Main Stats -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+                    <div id="balance-box" class="bg-gray-800 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">Current Balance</p>
+                        <p id="balance" class="text-2xl font-semibold">₹11,650.00</p>
+                    </div>
+                     <div id="cashout-box" class="bg-gray-800 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">Cashed Out</p>
+                        <p id="cashed-out" class="text-2xl font-semibold">₹0.00</p>
+                    </div>
+                    <div id="total-worth-box" class="bg-gray-800 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">Total Worth</p>
+                        <p id="total-worth" class="text-2xl font-semibold text-amber-400">₹11,650.00</p>
+                    </div>
+                    <div id="bet-box" class="bg-gray-800 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">Next Bet</p>
+                        <p id="current-bet" class="text-2xl font-semibold">₹50.00</p>
+                    </div>
+                </div>
+
+                <!-- Spin Result -->
+                <div class="flex flex-col md:flex-row items-center justify-around bg-gray-800 p-6 rounded-lg space-y-4 md:space-y-0">
+                    <div class="text-center">
+                        <p class="text-lg font-medium">Table <span id="table-number">1</span> | Spin <span id="spin-count">0</span></p>
+                        <p id="bet-on-display" class="text-sm text-gray-400">Betting on 1st Dozen</p>
+                    </div>
+                    <div id="winning-number-display" class="number-display number-black">
+                        <span id="winning-number">--</span>
+                    </div>
+                    <div class="text-center">
+                         <p id="spin-result" class="text-xl font-bold">-</p>
+                         <p id="profit-loss" class="text-base text-gray-400">-</p>
+                    </div>
+                </div>
+                
+                <!-- Controls -->
+                <div class="flex flex-col space-y-4">
+                     <button id="start-sim-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">
+                        Start Simulation
+                    </button>
+                     <button id="reset-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105" style="display: none;">
+                        Reset
+                    </button>
+                    <div id="final-result" class="text-center p-4 rounded-lg text-xl font-bold" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Right Panel (Graph & Log) -->
+            <div class="space-y-6">
+                <div class="bg-gray-800 p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-2 text-center text-gray-300">Bankroll History</h2>
+                    <canvas id="balance-chart"></canvas>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-lg h-48 overflow-y-auto">
+                    <div id="log" class="space-y-2 text-sm">
+                        <p class="text-gray-500">Simulation log will appear here...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Sections -->
+        <div class="space-y-4 pt-4">
+            <!-- Rules Section -->
+            <details class="bg-gray-800 p-4 rounded-lg">
+                <summary class="flex justify-between items-center font-semibold text-lg text-gray-300">
+                    Strategy Rules
+                    <span class="arrow transition-transform transform">▶</span>
+                </summary>
+                <div class="mt-4 text-gray-400 space-y-2 text-sm">
+                    <p><strong class="text-amber-400">Betting Progression:</strong> The game uses a Fibonacci-style sequence. After a loss, the next bet is increased. After a win, the bet resets to the minimum (₹50).</p>
+                    <p><strong class="text-amber-400">Cashout:</strong> After any win, the system checks if the current balance has grown by the set percentage over the last baseline. If so, the profit is moved to the "Cashed Out" wallet, and a table change is scheduled for the next win.</p>
+                    <p><strong class="text-amber-400">Stop-Loss:</strong> If the total loss within a single losing streak exceeds the set percentage of the current baseline, the streak is abandoned, the bet resets to the minimum, and the balance at that point becomes the new baseline.</p>
+                    <p><strong class="text-amber-400">Free Spin Mode:</strong> If a losing streak reaches the set number of losses, betting pauses. The game then waits for a "favorable" outcome on free spins before resuming bets.</p>
+                    <p><strong class="text-amber-400">Double Confirmation:</strong> If free spins continue for more than half the trigger amount, the system requires two consecutive favorable outcomes before resuming bets.</p>
+                    <p><strong class="text-amber-400">Table Change:</strong> A table change is triggered after a successful cashout or after entering Free Spin Mode for a second time on the same table. The change is executed upon the next winning spin.</p>
+                </div>
+            </details>
+            
+            <!-- Table Section -->
+            <details class="bg-gray-800 p-4 rounded-lg">
+                <summary class="flex justify-between items-center font-semibold text-lg text-gray-300">
+                    Original Probability Table
+                    <span class="arrow transition-transform transform">▶</span>
+                </summary>
+                <div class="mt-4 overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-400">
+                        <thead class="text-xs text-gray-300 uppercase bg-gray-700">
+                            <tr>
+                                <th scope="col" class="px-4 py-2">Spin</th>
+                                <th scope="col" class="px-4 py-2">Losing Streak %</th>
+                                <th scope="col" class="px-4 py-2">Win % (within n spins)</th>
+                                <th scope="col" class="px-4 py-2">Bet Amount</th>
+                                <th scope="col" class="px-4 py-2">Cumulative Loss</th>
+                                <th scope="col" class="px-4 py-2">Net Profit if Win</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">1</td> <td class="px-4 py-2">67.57%</td> <td class="px-4 py-2">32.43%</td> <td class="px-4 py-2">50</td> <td class="px-4 py-2">50</td> <td class="px-4 py-2">100</td> </tr>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">2</td> <td class="px-4 py-2">45.65%</td> <td class="px-4 py-2">54.35%</td> <td class="px-4 py-2">50</td> <td class="px-4 py-2">100</td> <td class="px-4 py-2">50</td> </tr>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">3</td> <td class="px-4 py-2">30.85%</td> <td class="px-4 py-2">69.15%</td> <td class="px-4 py-2">100</td> <td class="px-4 py-2">200</td> <td class="px-4 py-2">100</td> </tr>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">4</td> <td class="px-4 py-2">20.84%</td> <td class="px-4 py-2">79.16%</td> <td class="px-4 py-2">150</td> <td class="px-4 py-2">350</td> <td class="px-4 py-2">100</td> </tr>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">5</td> <td class="px-4 py-2">14.08%</td> <td class="px-4 py-2">85.92%</td> <td class="px-4 py-2">250</td> <td class="px-4 py-2">600</td> <td class="px-4 py-2">150</td> </tr>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">6</td> <td class="px-4 py-2">9.52%</td> <td class="px-4 py-2">90.48%</td> <td class="px-4 py-2">400</td> <td class="px-4 py-2">1000</td> <td class="px-4 py-2">200</td> </tr>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">7</td> <td class="px-4 py-2">6.43%</td> <td class="px-4 py-2">93.57%</td> <td class="px-4 py-2">650</td> <td class="px-4 py-2">1650</td> <td class="px-4 py-2">300</td> </tr>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">8</td> <td class="px-4 py-2">4.34%</td> <td class="px-4 py-2">95.66%</td> <td class="px-4 py-2">1050</td> <td class="px-4 py-2">2700</td> <td class="px-4 py-2">450</td> </tr>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">9</td> <td class="px-4 py-2">2.94%</td> <td class="px-4 py-2">97.06%</td> <td class="px-4 py-2">1700</td> <td class="px-4 py-2">4400</td> <td class="px-4 py-2">700</td> </tr>
+                            <tr class="border-b border-gray-700"> <td class="px-4 py-2">10</td> <td class="px-4 py-2">1.98%</td> <td class="px-4 py-2">98.02%</td> <td class="px-4 py-2">2750</td> <td class="px-4 py-2">7150</td> <td class="px-4 py-2">1100</td> </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const balanceEl = document.getElementById('balance');
+        const cashedOutEl = document.getElementById('cashed-out');
+        const totalWorthEl = document.getElementById('total-worth');
+        const currentBetEl = document.getElementById('current-bet');
+        const spinCountEl = document.getElementById('spin-count');
+        const tableNumberEl = document.getElementById('table-number');
+        const winningNumberEl = document.getElementById('winning-number');
+        const winningNumberDisplayEl = document.getElementById('winning-number-display');
+        const spinResultEl = document.getElementById('spin-result');
+        const profitLossEl = document.getElementById('profit-loss');
+        const logEl = document.getElementById('log');
+        const startBtn = document.getElementById('start-sim-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const finalResultEl = document.getElementById('final-result');
+        const balanceBox = document.getElementById('balance-box');
+        const betBox = document.getElementById('bet-box');
+        const startBalanceInput = document.getElementById('start-balance');
+        const targetBalanceInput = document.getElementById('target-balance');
+        const betSelectionEl = document.getElementById('bet-selection');
+        const freeSpinTriggerInput = document.getElementById('free-spin-trigger');
+        const cashoutSlider = document.getElementById('cashout-slider');
+        const cashoutValueEl = document.getElementById('cashout-value');
+        const stoplossSlider = document.getElementById('stoploss-slider');
+        const stoplossValueEl = document.getElementById('stoploss-value');
+        const betOnDisplayEl = document.getElementById('bet-on-display');
+        const chartCanvas = document.getElementById('balance-chart').getContext('2d');
+
+        // --- Game State ---
+        let originalInitialBalance, targetBalance, balance, spinCount, losingStreak, gameOver, simInterval, balanceChart;
+        let cashedOutAmount, currentBaseline, inFreeSpinMode, freeSpinThreshold;
+        let freeSpinsTaken, freeSpinWins, tableNumber, freeSpinSessionsThisTable, pendingTableChange;
+        let cashoutPercent, stopLossPercent, currentStreakLoss;
+        let balanceHistory = [];
+
+        const initialBetProgression = [50, 50, 100, 150, 250, 400, 650, 1050, 1700, 2750, 4450, 7200, 11650, 18850, 30500];
+        let betProgression = [];
+        const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+        
+        // --- Chart Initialization ---
+        function initChart() {
+            if (balanceChart) {
+                balanceChart.destroy();
+            }
+            balanceChart = new Chart(chartCanvas, {
+                type: 'line',
+                data: {
+                    labels: [0],
+                    datasets: [{
+                        label: 'Total Worth',
+                        data: [originalInitialBalance],
+                        borderColor: '#F59E0B',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.1,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: false, ticks: { color: '#9CA3AF' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                        x: { ticks: { color: '#9CA3AF' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // --- Initialization ---
+        function initialize() {
+            originalInitialBalance = parseFloat(startBalanceInput.value) || 1000;
+            targetBalance = parseFloat(targetBalanceInput.value) || originalInitialBalance * 2;
+            freeSpinThreshold = parseInt(freeSpinTriggerInput.value) || 8;
+            cashoutPercent = parseFloat(cashoutSlider.value) / 100;
+            stopLossPercent = parseFloat(stoplossSlider.value) / 100;
+
+            balance = originalInitialBalance;
+            currentBaseline = originalInitialBalance;
+            cashedOutAmount = 0;
+            spinCount = 0;
+            losingStreak = 0;
+            currentStreakLoss = 0;
+            gameOver = false;
+            inFreeSpinMode = false;
+            freeSpinsTaken = 0;
+            freeSpinWins = 0;
+            tableNumber = 1;
+            freeSpinSessionsThisTable = 0;
+            pendingTableChange = false;
+            betProgression = [...initialBetProgression];
+            balanceHistory = [originalInitialBalance];
+            
+            updateUI();
+            initChart();
+            logEl.innerHTML = '<p class="text-gray-500">Set your parameters and start the simulation.</p>';
+            
+            startBtn.disabled = false;
+            startBtn.style.display = 'block';
+            resetBtn.style.display = 'none';
+            finalResultEl.style.display = 'none';
+            balanceBox.classList.remove('highlight', 'win', 'loss');
+            
+            startBalanceInput.disabled = false;
+            targetBalanceInput.disabled = false;
+            betSelectionEl.disabled = false;
+            freeSpinTriggerInput.disabled = false;
+            cashoutSlider.disabled = false;
+            stoplossSlider.disabled = false;
+        }
+
+        // --- UI Update ---
+        function updateUI() {
+            const totalWorth = balance + cashedOutAmount;
+            balanceEl.textContent = `₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            cashedOutEl.textContent = `₹${cashedOutAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            totalWorthEl.textContent = `₹${totalWorth.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            tableNumberEl.textContent = tableNumber;
+            if (inFreeSpinMode) {
+                currentBetEl.textContent = 'Free Spin';
+            } else {
+                const nextBet = betProgression[losingStreak] || 'Dynamic';
+                if(typeof nextBet === 'number') {
+                    currentBetEl.textContent = `₹${nextBet.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                } else {
+                    currentBetEl.textContent = `₹${betProgression[betProgression.length - 1].toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                }
+            }
+            spinCountEl.textContent = spinCount;
+            betOnDisplayEl.textContent = `Betting on ${betSelectionEl.options[betSelectionEl.selectedIndex].text}`;
+        }
+
+        function updateChart() {
+            balanceChart.data.labels = Array.from({ length: balanceHistory.length }, (_, i) => i);
+            balanceChart.data.datasets[0].data = balanceHistory;
+            balanceChart.update('none');
+        }
+
+        // --- Logging ---
+        function logMessage(message, type = '') {
+            if (logEl.children.length > 100) {
+                logEl.removeChild(logEl.lastChild);
+            }
+            const entry = document.createElement('p');
+            entry.innerHTML = message;
+            entry.className = `log-entry ${type}`;
+            logEl.prepend(entry);
+        }
+
+        // --- Game Logic ---
+        function isWinningBet(number, betType) {
+            if (number === 0) return false;
+            switch (betType) {
+                case 'dozen1': return number >= 1 && number <= 12;
+                case 'dozen2': return number >= 13 && number <= 24;
+                case 'dozen3': return number >= 25 && number <= 36;
+                case 'col1': return number % 3 === 1;
+                case 'col2': return number % 3 === 2;
+                case 'col3': return number % 3 === 0;
+                default: return false;
+            }
+        }
+        
+        function checkForCashout() {
+            const cashoutThreshold = currentBaseline * (1 + cashoutPercent);
+            if (balance >= cashoutThreshold) {
+                const profitToCashout = balance - currentBaseline;
+                cashedOutAmount += profitToCashout;
+                balance -= profitToCashout;
+                currentBaseline = balance;
+                pendingTableChange = true;
+                logMessage(`--- <span class="cashout font-bold">Cashed out ₹${profitToCashout.toLocaleString('en-IN')}!</span> New baseline is ₹${currentBaseline.toLocaleString('en-IN')}. Will change tables on next win. ---`, 'cashout');
+            }
+        }
+
+        function runSpin() {
+            if (gameOver) {
+                clearInterval(simInterval);
+                return;
+            }
+
+            // Handle free spins
+            if (inFreeSpinMode) {
+                spinCount++;
+                freeSpinsTaken++;
+                const winningNumber = Math.floor(Math.random() * 37);
+                
+                winningNumberEl.textContent = winningNumber;
+                winningNumberDisplayEl.className = 'number-display';
+                if (winningNumber === 0) winningNumberDisplayEl.classList.add('number-green');
+                else if (redNumbers.includes(winningNumber)) winningNumberDisplayEl.classList.add('number-red');
+                else winningNumberDisplayEl.classList.add('number-black');
+
+                spinResultEl.textContent = "Free Spin";
+                spinResultEl.className = "text-xl font-bold info";
+                profitLossEl.textContent = "No Bet";
+
+                let freeSpinLog = `Spin ${spinCount}: Rolled <b>${winningNumber}</b>. (Free Spin)`;
+
+                const needsDoubleConfirmation = freeSpinsTaken > (freeSpinThreshold / 2);
+
+                if (isWinningBet(winningNumber, betSelectionEl.value)) {
+                    if (needsDoubleConfirmation) {
+                        freeSpinWins++;
+                        freeSpinLog += ` <span class="win">[Confirmation ${freeSpinWins}/2]</span>`;
+                        if (freeSpinWins >= 2) {
+                            inFreeSpinMode = false;
+                            logMessage(freeSpinLog, 'win');
+                            logMessage(`--- <span class="win font-bold">Double confirmation! Resuming bets.</span> ---`, 'win');
+                        } else {
+                             logMessage(freeSpinLog, 'info');
+                        }
+                    } else {
+                        inFreeSpinMode = false;
+                        logMessage(freeSpinLog, 'win');
+                        logMessage(`--- <span class="win font-bold">Favorable outcome. Resuming bets.</span> ---`, 'win');
+                    }
+                } else {
+                    if (needsDoubleConfirmation) {
+                        if(freeSpinWins > 0) freeSpinLog += ` <span class="loss">[Confirmation reset]</span>`;
+                        freeSpinWins = 0;
+                    }
+                    logMessage(freeSpinLog, 'info');
+                }
+                
+                updateUI();
+                return;
+            }
+
+            // Normal betting logic
+            spinCount++;
+
+            if (losingStreak >= betProgression.length) {
+                const nextBet = betProgression[betProgression.length - 1] + betProgression[betProgression.length - 2];
+                betProgression.push(nextBet);
+            }
+            const currentBet = betProgression[losingStreak];
+
+            if (balance < currentBet) {
+                endGame(false, `Bankrupt. Cannot afford next bet of ₹${currentBet}.`);
+                return;
+            }
+
+            balance -= currentBet;
+            currentStreakLoss += currentBet;
+            const winningNumber = Math.floor(Math.random() * 37);
+
+            winningNumberEl.textContent = winningNumber;
+            winningNumberDisplayEl.className = 'number-display';
+            if (winningNumber === 0) winningNumberDisplayEl.classList.add('number-green');
+            else if (redNumbers.includes(winningNumber)) winningNumberDisplayEl.classList.add('number-red');
+            else winningNumberDisplayEl.classList.add('number-black');
+
+            let logMsg = `Spin ${spinCount}: Bet ₹${currentBet.toLocaleString('en-IN')}. Rolled <b>${winningNumber}</b>. `;
+
+            const betType = betSelectionEl.value;
+            if (isWinningBet(winningNumber, betType)) {
+                const winnings = currentBet * 3;
+                balance += winnings;
+                spinResultEl.textContent = "WIN!";
+                spinResultEl.className = "text-xl font-bold win";
+                profitLossEl.textContent = `+₹${(winnings - currentBet).toLocaleString('en-IN')}`;
+                logMsg += `<span class="win font-bold">WIN!</span> Balance: ₹${balance.toLocaleString('en-IN')}.`;
+                logMessage(logMsg, 'win');
+                losingStreak = 0;
+                currentStreakLoss = 0;
+
+                if (pendingTableChange) {
+                    tableNumber++;
+                    freeSpinSessionsThisTable = 0;
+                    currentBaseline = balance;
+                    pendingTableChange = false;
+                    logMessage(`--- <span class="cashout font-bold">Win triggers table change. Now on Table ${tableNumber}.</span> ---`, 'cashout');
+                }
+                
+                checkForCashout();
+            } else {
+                spinResultEl.textContent = "LOSS";
+                spinResultEl.className = "text-xl font-bold loss";
+                profitLossEl.textContent = `-₹${currentBet.toLocaleString('en-IN')}`;
+                logMsg += `<span class="loss font-bold">LOSS.</span> Balance: ₹${balance.toLocaleString('en-IN')}.`;
+                logMessage(logMsg, 'loss');
+                losingStreak++;
+
+                const stopLossThreshold = currentBaseline * stopLossPercent;
+                if (currentStreakLoss >= stopLossThreshold) {
+                    logMessage(`--- <span class="loss font-bold">STOP-LOSS of ${stopLossPercent * 100}% (₹${stopLossThreshold.toLocaleString('en-IN')}) triggered!</span> Resetting bet. ---`, 'loss');
+                    losingStreak = 0;
+                    currentStreakLoss = 0;
+                    currentBaseline = balance;
+                    logMessage(`--- <span class="info font-bold">New baseline is now ₹${currentBaseline.toLocaleString('en-IN')}.</span> ---`, 'info');
+                } else if (losingStreak >= freeSpinThreshold) {
+                    inFreeSpinMode = true;
+                    freeSpinsTaken = 0;
+                    freeSpinWins = 0;
+                    freeSpinSessionsThisTable++;
+                    if (freeSpinSessionsThisTable > 1 && !pendingTableChange) {
+                        pendingTableChange = true;
+                        logMessage(`--- <span class="info font-bold">2nd Free Spin session. Will change tables on next win.</span> ---`, 'info');
+                    }
+                    logMessage(`--- <span class="info font-bold">${freeSpinThreshold} losses. Entering Free Spin mode...</span> ---`, 'info');
+                }
+            }
+            
+            balanceHistory.push(balance + cashedOutAmount);
+            updateUI();
+            updateChart();
+            
+            const totalWorth = balance + cashedOutAmount;
+            if (totalWorth >= targetBalance) endGame(true, "Target balance reached!");
+            else if (balance <= 0 && (balance + cashedOutAmount < targetBalance)) endGame(false, "Bankrupt. In-play balance is zero.");
+        }
+
+        function endGame(isWin, message) {
+            gameOver = true;
+            clearInterval(simInterval);
+            finalResultEl.textContent = message;
+            finalResultEl.style.display = 'block';
+            startBtn.style.display = 'none';
+            resetBtn.style.display = 'block';
+            
+            if (isWin) {
+                finalResultEl.className = 'text-center p-4 rounded-lg text-xl font-bold win bg-green-900/50';
+                balanceBox.classList.add('highlight', 'win');
+            } else {
+                finalResultEl.className = 'text-center p-4 rounded-lg text-xl font-bold loss bg-red-900/50';
+                balanceBox.classList.add('highlight', 'loss');
+            }
+        }
+
+        // --- Event Listeners ---
+        startBtn.addEventListener('click', () => {
+            initialize();
+            if (logEl.firstElementChild.textContent.includes("Set your parameters")) {
+                 logEl.innerHTML = '';
+            }
+            startBtn.disabled = true;
+            startBtn.textContent = "Simulating...";
+            startBalanceInput.disabled = true;
+            targetBalanceInput.disabled = true;
+            betSelectionEl.disabled = true;
+            freeSpinTriggerInput.disabled = true;
+            cashoutSlider.disabled = true;
+            stoplossSlider.disabled = true;
+            simInterval = setInterval(runSpin, 200);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            clearInterval(simInterval);
+            initialize();
+            startBtn.textContent = "Start Simulation";
+        });
+
+        cashoutSlider.addEventListener('input', (e) => {
+            cashoutValueEl.textContent = `${e.target.value}%`;
+        });
+
+        stoplossSlider.addEventListener('input', (e) => {
+            stoplossValueEl.textContent = `${e.target.value}%`;
+        });
+
+        // --- Initial Load ---
+        window.onload = initialize;
+
+    </script>
+</body>
+</html>
