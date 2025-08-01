@@ -510,7 +510,11 @@
                 balance += winnings;
                 spinResultEl.textContent = "WIN!";
                 spinResultEl.className = "text-xl font-bold win";
-                profitLossEl.textContent = `+₹${(winnings - currentBet).toLocaleString('en-IN')}`;
+                
+                const cashoutThreshold = currentBaseline * (1 + cashoutPercent);
+                const neededForCashout = Math.max(0, cashoutThreshold - balance);
+                profitLossEl.textContent = `+₹${(winnings - currentBet).toLocaleString('en-IN')} | ₹${neededForCashout.toLocaleString('en-IN', {minimumFractionDigits: 2})} to cashout`;
+
                 logMsg += `<span class="win font-bold">WIN!</span> Balance: ₹${balance.toLocaleString('en-IN')}.`;
                 logMessage(logMsg, 'win');
                 losingStreak = 0;
